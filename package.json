@@ -1,0 +1,10 @@
+{
+  "name" : "woffglitch.js",
+  "version": "0.0.1",
+  "homepage": "http://github.com/hryk/woffglitch",
+  "description": "Glitch WOFF Fonts.",
+  "keywords": ["font", "glitch"],
+  "licenses": ["MIT"],
+  "dependencies": {},
+  "main": "lib/woff.js"
+}
