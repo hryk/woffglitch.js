@@ -149,7 +149,7 @@
     var table;
     for (var dir_index in this.__table_dirs) {
       if (BinUtil.bytes_to_string(this.__table_dirs[dir_index].tag) === tag) {
-        table = this.table_dir(dir);
+        table = this.table_dir(dir_index);
         break;
       }
     }
@@ -199,15 +199,21 @@
   WOFF.prototype._calc_table_checksum = function(str) {
     console.log('calculating checksum');
     var table = BinUtil.read_bytes(str); // <- TODO: string. retrieve as uint32.
-    var number_of_bytes_in_table = table.length,
+    var number_of_bytes_in_table = table.length*2,
         sum     = 0,
         nlongs  = Math.round((number_of_bytes_in_table + 3) / 4);
     console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table );
     console.log('nlongs:'+ nlongs);
-    for (var i=0; i<nlongs; i++){
-      sum += table[i];
+    var j = 0;
+    console.log(table);
+    while(nlongs -= 1 > 0){
+      var b0 = (typeof(table[j])   !== 'undefined') ? table[j]   : 0,
+          b1 = (typeof(table[j+1]) !== 'undefined') ? table[j+1] : 0,
+          b2 = (typeof(table[j+2]) !== 'undefined') ? table[j+2] : 0;
+      sum += BinUtil.bytes_to_uint32([b0, b1, b2, 0]);
+      j+=1;
     }
-    console.log('sum'+sum);
+    console.log('sum: '+sum);
     return sum;
   };
 
@@ -303,12 +309,12 @@
       var set = true;
       if (typeof(value) === "undefined") set = false;
       // Uncompressed Font table.
-      if (table_info.comp_length === table_info.orig_length) {
+      if (table_info.comp_len === table_info.orig_len) {
         if (set) {
-          return this._set_uncompressed_font_table(index, value);
+          this._set_uncompressed_font_table(index, value);
         }
         else {
-          return this._get_uncompressed_font_table(index);
+          this._get_uncompressed_font_table(index);
         }
       }
       // Compressed Font table.
@@ -320,13 +326,13 @@
           // tables in the input font, except that each table **MAY** have been
           // compressed.
           //
-          return this._set_uncompressed_font_table(index, value);
+          this._set_uncompressed_font_table(index, value);
         }
         else {
           this._get_compressed_font_table(index);
-          return this;
         }
       }
+      return this;
     }
   };
 

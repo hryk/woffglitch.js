@@ -28,7 +28,7 @@
     // TODO: Support TTF, OTF.
     // this.EE.on('font_truetype_loaded', this.log.error, this);
     // this.EE.on('font_opentype_loaded', this.log.error, this);
-  };
+  }
 
   /**
    * Logger
@@ -42,7 +42,7 @@
     error: function(message){
       console.error('[ERROR] WOFFGlitch: '+message);
     }
-  }
+  };
 
   WOFFGlitch.prototype._data_scheme = function(raw, format){
     var media_type = '';
@@ -59,7 +59,7 @@
       default:
         this.log.error('_data_scheme: unsupported format "'+format+"'");
       break;
-    };
+    }
     return "url('data:" + media_type + ";base64," + Base64.toBase64(raw) + "')";
   };
 
@@ -92,15 +92,14 @@
     var woff      = new WOFF(raw);
     var table_dir = woff.table_dir_by_tag('glyf');
 
-    woff.font_table(table_dir.index)
-        .on('inflated_table',
-            function(table_data){
-              var table_data = table_data.replace(/0/, 1);
+    woff.font_table(table_dir.index).
+        on('inflated_table', function(table_data) {
+              table_data = table_data.replace(/0/, 1);
               var that = this;
               setTimeout(function(){
                 that.font_table(table_dir.index, table_data);
               }, 0);
-            });
+        });
   };
 
   /**
@@ -161,7 +160,7 @@
     else {
       this.log.error('Failed to parse @font-face (Font url)');
     }
-  }
+  };
 
   /**
    * Load glitched webfont.
@@ -177,7 +176,7 @@
       success: function(data){ this.EE.emit('font_css_loaded', data); },
       error: function(status){ this.EE.emit('error', status); }
     });
-  }
+  };
 
   /**
    * Load Multiple fonts at once.
