@@ -196,22 +196,32 @@
 
   // TTF Checksum.
   // https://developer.apple.com/fonts/TTRefMan/RM06/Chap6.html
+  //
+  // TODO: Compressedなバイナリのチェックサム計算に失敗している.
+  //       Uncompressedはok.
   WOFF.prototype._calc_table_checksum = function(str) {
-    console.log('calculating checksum');
     var table = BinUtil.read_bytes(str); // <- TODO: string. retrieve as uint32.
     var number_of_bytes_in_table = table.length*2,
         sum     = 0,
-        nlongs  = Math.round((number_of_bytes_in_table + 3) / 4);
-    console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table );
+        nlongs  = Math.floor((number_of_bytes_in_table + 3) / 4);
+    console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table);
     console.log('nlongs:'+ nlongs);
     var j = 0;
-    console.log(table);
     while(nlongs -= 1 > 0){
+      if ((typeof(table[j+3]) === 'undefined')) break;
       var b0 = (typeof(table[j])   !== 'undefined') ? table[j]   : 0,
           b1 = (typeof(table[j+1]) !== 'undefined') ? table[j+1] : 0,
-          b2 = (typeof(table[j+2]) !== 'undefined') ? table[j+2] : 0;
-      sum += BinUtil.bytes_to_uint32([b0, b1, b2, 0]);
-      j+=1;
+          b2 = (typeof(table[j+2]) !== 'undefined') ? table[j+2] : 0,
+          b3 = (typeof(table[j+3]) !== 'undefined') ? table[j+3] : 0;
+      var uint = BinUtil.bytes_to_uint32([b0, b1, b2, b3]);
+      if (uint > Math.pow(2, 32)) {
+        console.log('overflow');
+      }
+      sum += uint;
+      if (sum >= Math.pow(2, 32)) {
+        sum = sum - Math.pow(2, 32);
+      }
+      j+=4;
     }
     console.log('sum: '+sum);
     return sum;
@@ -312,9 +322,10 @@
       if (table_info.comp_len === table_info.orig_len) {
         if (set) {
           this._set_uncompressed_font_table(index, value);
+          return this;
         }
         else {
-          this._get_uncompressed_font_table(index);
+          return this._get_uncompressed_font_table(index);
         }
       }
       // Compressed Font table.
@@ -327,12 +338,12 @@
           // compressed.
           //
           this._set_uncompressed_font_table(index, value);
+          return this;
         }
         else {
-          this._get_compressed_font_table(index);
+          return this._get_compressed_font_table(index);
         }
       }
-      return this;
     }
   };
 
