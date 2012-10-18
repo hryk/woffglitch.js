@@ -199,7 +199,32 @@
   //
   // TODO: Compressedなバイナリのチェックサム計算に失敗している.
   //       Uncompressedはok.
-  WOFF.prototype._calc_table_checksum = function(str) {
+  //       一部Compressedでもチェックサムが正しく出ている場合もある。なぜか。
+  //       あと一個
+  //
+  // headだけ別扱い
+  //
+  // To calculate the checkSum for the 'head' table which itself includes the
+  // checkSumAdjustment entry for the entire font, do the following:
+  //
+  // - Set the checkSumAdjustment to 0.
+  // - Calculate the checksum for all the tables including the 'head' table
+  //   and enter that value into the table directory.
+  // - Calculate the checksum for the entire font.
+  // - Subtract that value from the hex value B1B0AFBA.
+  // - Store the result in checkSumAdjustment.
+  //
+  // The checkSum for the 'head table which includes the checkSumAdjustment
+  // entry for the entire font is now incorrect. That is not a problem. Do not
+  // change it. An application attempting to verify that the 'head' table has
+  // not changed should calculate the checkSum for that table by not including
+  // the checkSumAdjustment value, and compare the result with the entry in the
+  // table directory.
+  //
+  //
+  WOFF.prototype._calc_table_checksum = function(str, is_head_table) {
+    if (typeof(is_head_table) === 'undefined')
+      is_head_table = false;
     var table = BinUtil.read_bytes(str); // <- TODO: string. retrieve as uint32.
     var number_of_bytes_in_table = table.length*2,
         sum     = 0,
@@ -207,23 +232,25 @@
     console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table);
     console.log('nlongs:'+ nlongs);
     var j = 0;
-    while(nlongs -= 1 > 0){
-      if ((typeof(table[j+3]) === 'undefined')) break;
-      var b0 = (typeof(table[j])   !== 'undefined') ? table[j]   : 0,
-          b1 = (typeof(table[j+1]) !== 'undefined') ? table[j+1] : 0,
-          b2 = (typeof(table[j+2]) !== 'undefined') ? table[j+2] : 0,
-          b3 = (typeof(table[j+3]) !== 'undefined') ? table[j+3] : 0;
-      var uint = BinUtil.bytes_to_uint32([b0, b1, b2, b3]);
-      if (uint > Math.pow(2, 32)) {
-        console.log('overflow');
-      }
-      sum += uint;
-      if (sum >= Math.pow(2, 32)) {
-        sum = sum - Math.pow(2, 32);
-      }
+    var b0, b1, b2, b3, uint;
+    while (nlongs -= 1 > 0) {
+     if (typeof(table[j]) === 'undefined') break;
+     if (!(is_head_table && j == 8)) {
+       b0 = (typeof(table[j])   !== 'undefined') ? table[j]   : 0;
+       b1 = (typeof(table[j+1]) !== 'undefined') ? table[j+1] : 0;
+       b2 = (typeof(table[j+2]) !== 'undefined') ? table[j+2] : 0;
+       b3 = (typeof(table[j+3]) !== 'undefined') ? table[j+3] : 0;
+
+       uint = BinUtil.bytes_to_uint32([b0, b1, b2, b3]);
+
+       sum += uint;
+       if (sum > Math.pow(2, 32)) {
+         sum = sum - Math.pow(2, 32);
+       }
+     }
       j+=4;
     }
-    console.log('sum: '+sum);
+    console.log('calculated sum: '+sum);
     return sum;
   };
 
@@ -290,7 +317,7 @@
       // multiple of 4 bytes in length, or whether this applies only between
       // tables, and the final table of the file may be left unpadded.
       var offset = table_info.offset;
-      if (table_info.index > 1) offset += 2;
+      if (table_info.index > 0) offset += 2;
       var compressed = this.__data.substr(offset, table_info.comp_length);
       var that       = this;
       this.__font_tables[index] = RawDeflate.inflate(compressed);
@@ -319,7 +346,8 @@
       var set = true;
       if (typeof(value) === "undefined") set = false;
       // Uncompressed Font table.
-      if (table_info.comp_len === table_info.orig_len) {
+      if (BinUtil.bytes_to_uint32(table_info.comp_length) ===
+          BinUtil.bytes_to_uint32(table_info.orig_length)) {
         if (set) {
           this._set_uncompressed_font_table(index, value);
           return this;
@@ -341,6 +369,9 @@
           return this;
         }
         else {
+          console.log('----------------------compressed');
+          // TESTING
+          // return this._get_uncompressed_font_table(index);
           return this._get_compressed_font_table(index);
         }
       }

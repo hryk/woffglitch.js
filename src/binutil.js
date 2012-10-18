@@ -118,7 +118,8 @@
       value |= parseInt("0x"+bytes[1], 16) << 16;
       value |= parseInt("0x"+bytes[2], 16) << 8;
       value |= parseInt("0x"+bytes[3], 16);
-      if (value < 0) value = -1 * value;
+      if (value > Math.pow(2, 32)) value = value - Math.pow(2, 32);
+      if (value < 0) value = Math.pow(2, 32) + value;
       return value;
     },
     /**

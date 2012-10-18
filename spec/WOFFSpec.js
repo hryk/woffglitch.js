@@ -23,15 +23,39 @@ describe("WOFF", function(){
     expect(kern_table.offset).toEqual(11212);
   });
 
-  it("should calculate checksum correctly", function(){
+  it("should calculate length correctly", function(){
     var all_table = woff.table_dirs();
     for (var table_index in all_table) {
-      console.log(table_index+" : "+all_table[table_index].tag);
-      var original_checksum = all_table[table_index].orig_checksum,
+      var original_length = all_table[table_index].orig_length,
           table_data        = woff.font_table(table_index);
-      var checksum = woff._calc_table_checksum(table_data);
+      var length = table_data.length;
+      expect(length).toEqual(original_length);
+    }
+  });
+
+  it("should calculate checksum correctly", function(){
+    var original_checksum, table_data, checksum;
+    var all_table = woff.table_dirs();
+    for (var table_index in all_table) {
+      if (all_table[table_index].tag !== 'head') {
+      console.log(table_index+" : "+all_table[table_index].tag);
+      original_checksum = all_table[table_index].orig_checksum;
+      table_data        = woff.font_table(table_index);
+      checksum = woff._calc_table_checksum(table_data);
       console.log(checksum+" -> "+original_checksum);
+      console.log(table_data.length+" -> "+all_table[table_index].orig_length);
       expect(checksum).toEqual(original_checksum);
+      }
+      else {
+        // head table
+      table_data        = woff.font_table(table_index);
+      original_checksum = all_table[table_index].orig_checksum;
+      checksum = woff._calc_table_checksum(table_data, true);
+      console.log(checksum+" -> "+original_checksum);
+      console.log(table_data.length+" -> "+all_table[table_index].orig_length);
+
+        expect(checksum).toEqual(original_checksum);
+      }
     }
   });
 });
