@@ -92,14 +92,17 @@
     var woff      = new WOFF(raw);
     var table_dir = woff.table_dir_by_tag('glyf');
 
-    woff.font_table(table_dir.index).
-        on('inflated_table', function(table_data) {
-              table_data = table_data.replace(/0/, 1);
-              var that = this;
-              setTimeout(function(){
-                that.font_table(table_dir.index, table_data);
-              }, 0);
-        });
+    var table_data = woff.font_table(table_dir.index);
+    table_data = table_data.replace(/0/, 1);
+    setTimeout(function(){
+      woff.font_table(table_dir.index, table_data);
+      var new_raw = woff.create();
+      setTimeout(function(){
+        this.EE.emit('font_glitched',
+                     Base64.toBase64(new_raw),
+                     font);
+      }, 0);
+    }, 0);
   };
 
   /**

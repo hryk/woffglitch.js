@@ -3,11 +3,12 @@ WOFFGlitch
 
 Glitch web fonts (.woff)
 
-### SYNOPSYS
+### Synopsys
 
     var woff_glitch = new WOFFGlitch();
     woff_glitch.load('http://font/url.woff');
-    woff_glitch.on('load', function(){ $('h1').css('font-family', 'Nunito')});
+    woff_glitch.on('load',
+                   function(){ $('h1').css('font-family', 'Nunito')});
 
 ### Dependencies
 

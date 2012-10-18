@@ -139,6 +139,33 @@
   };
 
   /**
+   * Create Binary WOFF data.
+   *
+   * TODO
+   *
+   * @public
+   * @return raw data of font.
+   */
+  WOFF.prototype.create = function(){
+    throw new Error("WOFF.create have not been implemented yet.");
+    // Calculating offset of each font table.
+
+    // Calculating checksum of each font table.
+
+
+    // Rewrite woff header values.
+    //
+    // - length
+    // - total_sfnt_size
+    //
+
+    // Calculating checksum of entire table.
+    //  => Update 'head' table's checkSumAdjustment.
+
+    // Packing. (header, table_dirs => ByteArray, font_tables => ByteString)
+  };
+
+  /**
    * Get table directory by tag name.
    *
    * @public
@@ -197,11 +224,6 @@
   // TTF Checksum.
   // https://developer.apple.com/fonts/TTRefMan/RM06/Chap6.html
   //
-  // TODO: Compressedなバイナリのチェックサム計算に失敗している.
-  //       Uncompressedはok.
-  //       一部Compressedでもチェックサムが正しく出ている場合もある。なぜか。
-  //       あと一個
-  //
   // headだけ別扱い
   //
   // To calculate the checkSum for the 'head' table which itself includes the
@@ -221,7 +243,15 @@
   // the checkSumAdjustment value, and compare the result with the entry in the
   // table directory.
   //
-  //
+
+  /**
+   * Calculating checksum of font-table.
+   *
+   * @private
+   * @param {String} raw data of font-table.
+   * @param {Boolean} Is it 'head' table?
+   * @return {Integer} checksum
+   */
   WOFF.prototype._calc_table_checksum = function(str, is_head_table) {
     if (typeof(is_head_table) === 'undefined')
       is_head_table = false;
@@ -229,13 +259,13 @@
     var number_of_bytes_in_table = table.length*2,
         sum     = 0,
         nlongs  = Math.floor((number_of_bytes_in_table + 3) / 4);
-    console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table);
-    console.log('nlongs:'+ nlongs);
+    // console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table);
+    // console.log('nlongs:'+ nlongs);
     var j = 0;
     var b0, b1, b2, b3, uint;
     while (nlongs -= 1 > 0) {
      if (typeof(table[j]) === 'undefined') break;
-     if (!(is_head_table && j == 8)) {
+     if (!(is_head_table && j == 8)) { // skip checkSumAdjustment of head table.
        b0 = (typeof(table[j])   !== 'undefined') ? table[j]   : 0;
        b1 = (typeof(table[j+1]) !== 'undefined') ? table[j+1] : 0;
        b2 = (typeof(table[j+2]) !== 'undefined') ? table[j+2] : 0;
@@ -250,28 +280,24 @@
      }
       j+=4;
     }
-    console.log('calculated sum: '+sum);
+    // console.log('calculated sum: '+sum);
     return sum;
   };
 
-  /*
-   * uint32 CalcTableChecksum(uint32 *table, uint32 numberOfBytesInTable)
-   *     {
-   *      uint32 sum = 0;
-   *      uint32 nLongs = (numberOfBytesInTable + 3) / 4;
+  /**
+   * Set WOFF header data (uncompressed).
    *
-   *      while (nLongs-- > 0)
-   *        sum += *table++;
-   *
-   *      return sum;
-   *     }
+   * @private
+   * @param {Integer} index of font-table.
+   * @param {String} raw data of font-table to set.
    */
-
   WOFF.prototype._set_uncompressed_font_table = function(index, value) {
     if (typeof(value) === 'object') value = BinUtil.bytes_to_string(value);
+    var is_head_table = false;
+    if (BinUtil.bytes_to_string(this.__table_dirs[index].tag) === 'head')
+      is_head_table = true;
     var that     = this,
-        checksum = this._calc_table_checksum(value);
-    console.log(checksum);
+    checksum = this._calc_table_checksum(value, true);
     // 先頭4byteがパディングの場合かつパディングが無い場合、パディングを付加する(4byte 0)
     setTimeout(function(){
       that.__table_dirs[index].orig_checksum = checksum;
@@ -281,21 +307,13 @@
     }, 0);
   };
 
-  // WOFF.prototype._set_compressed_font_table = function(index, value) {
-  //   if (typeof(value) === 'object')
-  //    value = this._b_to_str(value);
-  //   var that = this;
-  //   setTimeout(function(){
-  //     that.__font_tables[index]            = comp_value;
-  //     that.__table_dirs[index].comp_length = comp_value.length;
-  //     that.__table_dirs[index].orig_length = value.length;
-  //     var checksum = that._calc_checksum(value);
-  //     setTimeout(function(){
-  //       that.__table_dirs[index].orig_checksum = checksum;
-  //     }, 0);
-  //   },0);
-  // };
-
+  /**
+   * Get WOFF header data which is not compressed.
+   *
+   * @private
+   * @param {Integer} index of font-table.
+   * @return {String} font data.
+   */
   WOFF.prototype._get_uncompressed_font_table = function(index) {
     var table_info = this.table_dir(index);
 
@@ -305,17 +323,22 @@
     return this.__font_tables[index];
   };
 
+  /**
+   * Get compressed WOFF header data.
+   *
+   * @private
+   * @param {Integer} index of font-table.
+   * @return {String} uncompressed font data.
+   */
   WOFF.prototype._get_compressed_font_table = function(index) {
     var table_info = this.table_dir(index);
-
     if (typeof(this.__font_tables[index]) === "undefined") {
-      //
-      // 先頭4byteがパディングの場合、2バイト文字なのでoffset+2する。
       //
       // The OpenType/OFF specification is not entirely clear about whether all
       // tables in an sfnt font must be padded with 0-3 zero bytes to a
       // multiple of 4 bytes in length, or whether this applies only between
       // tables, and the final table of the file may be left unpadded.
+      //
       var offset = table_info.offset;
       if (table_info.index > 0) offset += 2;
       var compressed = this.__data.substr(offset, table_info.comp_length);
@@ -369,9 +392,6 @@
           return this;
         }
         else {
-          console.log('----------------------compressed');
-          // TESTING
-          // return this._get_uncompressed_font_table(index);
           return this._get_compressed_font_table(index);
         }
       }
@@ -411,23 +431,6 @@
     }
   };
 
-  /**
-   * Create Binary WOFF data.
-   *
-   * @public
-   */
-  WOFF.prototype.create = function(){
-    throw new Error("WOFF.create have not been implemented yet.");
-    // Calculating offset of each font table.
-
-    // Calculating checksum of each font table.
-
-    // Rewrite header values.
-
-    // Calculating checksum of entire table.
-
-    // Packing. (header, table_dirs => ByteArray, font_tables => ByteString)
-  };
 
   // Export
 	if(typeof define === 'function' && define.amd) {
@@ -436,4 +439,5 @@
 	else {
 		exports.WOFF = WOFF;
 	}
+
 })(this);
