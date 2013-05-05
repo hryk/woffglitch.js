@@ -15,10 +15,12 @@
      * @param {String} data String representation of binary data.
      * @param {Integer} start Position of start to read.
      * @param {Integer} length Length of bytes to read.
+     * @param {Boolean} convert integer to 0x**
      * @return {Array} ByteArray
      */
-    read_bytes: function(bytestring, start, length){
+    read_bytes: function(bytestring, start, length, conv){
       if (typeof start  === 'undefined') start  = 0;
+      if (typeof conv  === 'undefined') conv  = false;
       if (typeof length === 'undefined') length = bytestring.length;
       var str    = bytestring.substr(start, length),
           bytes  = [],
@@ -36,7 +38,12 @@
         bytes = bytes.concat( st.reverse() );
       }
       for (var j=0;j<bytes.length;j++) {
-        bytes[j] = bytes[j].toString(16);
+        if (conv) {
+          bytes[j] = "0x"+bytes[j].toString(16);
+        }
+        else {
+          bytes[j] = bytes[j].toString(16);
+        }
       }
       return bytes;
     },

@@ -104,25 +104,25 @@
       priv_offset     : BinUtil.read_bytes(this.__data, (current+=4), 4),
       priv_length     : BinUtil.read_bytes(this.__data, (current+=4), 4)
     };
-    console.log('current position: '+current);
-    console.log("sig: "+        BinUtil.bytes_to_string(this.__woff_header.signature));
-    console.log("flavor: "+     BinUtil.bytes_to_uint32(this.__woff_header.flavor));
-    console.log("length: "+     BinUtil.bytes_to_uint32(this.__woff_header.length));
-    console.log("tables: "+     BinUtil.bytes_to_uint16(this.__woff_header.num_tables));
-    console.log("sfnt_size: "+  BinUtil.bytes_to_uint32(this.__woff_header.total_sfnt_size));
-    console.log("major v: "+    BinUtil.bytes_to_uint16(this.__woff_header.major_version));
-    console.log("minor v: "+    BinUtil.bytes_to_uint16(this.__woff_header.minor_version));
-    console.log("meta offset: "+BinUtil.bytes_to_uint32(this.__woff_header.meta_offset));
-    console.log("meta length: "+BinUtil.bytes_to_uint32(this.__woff_header.meta_length));
-    console.log("priv offset: "+BinUtil.bytes_to_uint32(this.__woff_header.priv_offset));
-    console.log("priv length: "+BinUtil.bytes_to_uint32(this.__woff_header.priv_length));
+    console.log('current position: ' + current);
+    console.log("sig: "+          BinUtil.bytes_to_string(this.__woff_header.signature));
+    console.log("flavor: "+       BinUtil.bytes_to_uint32(this.__woff_header.flavor));
+    console.log("length: "+       BinUtil.bytes_to_uint32(this.__woff_header.length));
+    console.log("tables: "+       BinUtil.bytes_to_uint16(this.__woff_header.num_tables));
+    console.log("sfnt_size: "+    BinUtil.bytes_to_uint32(this.__woff_header.total_sfnt_size));
+    console.log("major v: "+      BinUtil.bytes_to_uint16(this.__woff_header.major_version));
+    console.log("minor v: "+      BinUtil.bytes_to_uint16(this.__woff_header.minor_version));
+    console.log("meta offset: " + BinUtil.bytes_to_uint32(this.__woff_header.meta_offset));
+    console.log("meta length: " + BinUtil.bytes_to_uint32(this.__woff_header.meta_length));
+    console.log("priv offset: " + BinUtil.bytes_to_uint32(this.__woff_header.priv_offset));
+    console.log("priv length: " + BinUtil.bytes_to_uint32(this.__woff_header.priv_length));
     // Reading table directories.
     this.__table_dirs = [];
     var num_tables    = BinUtil.bytes_to_uint16(this.__woff_header.num_tables);
     for (var i=0; i < num_tables;i++) {
       current += 4;
       this.__table_dirs.push({
-        index: i,
+        index:         i,
         tag:           BinUtil.read_bytes(this.__data, current,      4),
         offset:        BinUtil.read_bytes(this.__data, (current+=4), 4),
         comp_length:   BinUtil.read_bytes(this.__data, (current+=4), 4),
@@ -139,6 +139,68 @@
   };
 
   /**
+   * Update WOFF Header
+   *
+   * TODO
+   *
+   * @private
+   *
+   */
+  WOFF.prototype._update_header = function(){
+    // update length
+    // WOFF header + table dir + font table + (ExtendedMetadata + PrivateData)
+    // update total_sfnt_size
+    // WOFF header + table dir + font table (uncompressed) + (ExtendedMetadata + PrivateData)
+    // Total size needed for the uncompressed font data, including the sfnt
+    // header, directory, and font tables (including padding).
+    var woff_length     = 44 + (this.__table_dirs.length * 16);
+    var total_sfnt_size = 12 + (this.__table_dirs.length * 16);
+    for (var i=0;i<this.__table_dirs.length;i++) {
+      woff_length += BinUtil.bytes_to_uint32(this.__table_dirs[i].comp_length);
+      var pad = (BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length)) % 4;
+      if (pad !== 0) {
+        total_sfnt_size += BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length) + pad;
+      }
+      else {
+        total_sfnt_size += BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length);
+      }
+    }
+    this.__woff_header.length = BinUtil.uint32_to_bytes(woff_length);
+    this.__woff_header.total_sfnt_size = BinUtil.uint32_to_bytes(total_sfnt_size);
+  };
+
+  /**
+   * Update offset of font tables.
+   *
+   * TODO
+   *
+   * @private
+   *
+   */
+  WOFF.prototype._update_table_offsets = function(){
+    var table_dir;
+    for (var i=0;i < this.__table_dirs.length;i++) {
+      table_dir = this.__table_dirs[i];
+      console.log("---------"+ BinUtil.bytes_to_string(this.__table_dirs[i].tag) +"----------");
+      console.log("original offset:   " + BinUtil.bytes_to_uint32(this.__table_dirs[i].offset));
+      console.log("calculated offset: " + this._get_table_offsets(i));
+    }
+  };
+
+  WOFF.prototype._get_table_offsets = function(index){
+    var offset = 0;
+    for (var i=0;i <= index;i++) {
+      if (i === 0) {
+        offset = BinUtil.bytes_to_uint32(this.__table_dirs[i].offset);
+      }
+      else {
+        offset += BinUtil.bytes_to_uint32(this.__table_dirs[i-1].comp_length);
+      }
+    }
+    return offset;
+  };
+
+  /**
    * Create Binary WOFF data.
    *
    * TODO
@@ -147,22 +209,27 @@
    * @return raw data of font.
    */
   WOFF.prototype.create = function(){
-    throw new Error("WOFF.create have not been implemented yet.");
+    var new_raw;
+    console.log(this);
+
     // Calculating offset of each font table.
+    //
+    // - offset
+    //
+    this._update_table_offsets();
 
-    // Calculating checksum of each font table.
-
-
-    // Rewrite woff header values.
+    // Update woff header values.
     //
     // - length
     // - total_sfnt_size
     //
+    this._update_header();
 
     // Calculating checksum of entire table.
     //  => Update 'head' table's checkSumAdjustment.
-
+    return BinUtil.read_bytes(this.__data, 0, this.__data.length, true);
     // Packing. (header, table_dirs => ByteArray, font_tables => ByteString)
+    return new_raw;
   };
 
   /**
@@ -255,12 +322,10 @@
   WOFF.prototype._calc_table_checksum = function(str, is_head_table) {
     if (typeof(is_head_table) === 'undefined')
       is_head_table = false;
-    var table = BinUtil.read_bytes(str); // <- TODO: string. retrieve as uint32.
+    var table = BinUtil.read_bytes(str);
     var number_of_bytes_in_table = table.length*2,
         sum     = 0,
         nlongs  = Math.floor((number_of_bytes_in_table + 3) / 4);
-    // console.log('number_of_bytes_in_table:'+ number_of_bytes_in_table);
-    // console.log('nlongs:'+ nlongs);
     var j = 0;
     var b0, b1, b2, b3, uint;
     while (nlongs -= 1 > 0) {
@@ -280,7 +345,6 @@
      }
       j+=4;
     }
-    // console.log('calculated sum: '+sum);
     return sum;
   };
 
@@ -296,13 +360,13 @@
     var is_head_table = false;
     if (BinUtil.bytes_to_string(this.__table_dirs[index].tag) === 'head')
       is_head_table = true;
-    var that     = this,
+    var that = this,
     checksum = this._calc_table_checksum(value, true);
     // 先頭4byteがパディングの場合かつパディングが無い場合、パディングを付加する(4byte 0)
     setTimeout(function(){
-      that.__table_dirs[index].orig_checksum = checksum;
-      that.__table_dirs[index].comp_length   = value.length;
-      that.__table_dirs[index].orig_length   = value.length;
+      that.__table_dirs[index].orig_checksum = BinUtil.uint32_to_bytes(checksum);
+      that.__table_dirs[index].comp_length   = BinUtil.uint32_to_bytes(value.length);
+      that.__table_dirs[index].orig_length   = BinUtil.uint32_to_bytes(value.length);
       that.__font_tables[index]              = value;
     }, 0);
   };
@@ -439,5 +503,4 @@
 	else {
 		exports.WOFF = WOFF;
 	}
-
 })(this);

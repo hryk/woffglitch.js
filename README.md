@@ -15,6 +15,10 @@ Glitch web fonts (.woff)
  * rawdeflate.js
  * EventEmitter.js
 
+### Acknowledgements
+
+ * @youpy
+
 ### Author
 
 hryk (@1vq9)
