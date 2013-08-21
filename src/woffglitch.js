@@ -62,7 +62,8 @@
     }
     console.log(raw);
     var b64 = btoa(String.fromCharCode.apply(null, raw));
-    return "url('data:" + media_type + ";base64," + b64 + "')";
+    // return "url('data:" + media_type + ";base64," + b64 + "')";
+    return "data:" + media_type + ";base64," + b64 + "";
   };
 
   /**
@@ -71,15 +72,14 @@
    * @private
    */
   WOFFGlitch.prototype.build_font_face = function(raw, font){
-    var font_face = font.original_css.replace(/url\(.+?\)/, this._data_scheme(raw, font.format));
+    var font_face = font.original_css.replace(/url\(.+?\)/, "url('"+this._data_scheme(raw, font.format)+"')");
     var family    = this.font_family;
     this.log.debug(font_face);
-    // Replace url with data scheme.
-    // Insert font-face as style tag
+    var that = this;
     $("<style></style>").text(font_face).appendTo($("head"));
     setTimeout(function(){
-      console.log("hoge");
-      $("h1").css('font-family', family);
+      $("html").css('font-family', family);
+      that.EE.emit('woffglitch_callback', raw, family, font.format);
     }, 0);
   };
 
@@ -95,20 +95,19 @@
    * @param {String} Raw WOFF data (binary string).
    */
   WOFFGlitch.prototype.glitchers.woff = function(raw, font){
-    this.log.debug('glitch start.');
     var woff       = new WOFF(raw);
     var table_dir  = woff.table_dir_by_tag('glyf');
     var table_data = woff.font_table(table_dir.index);
     var that       = this;
+
+    // Glitch!
     // table_data = table_data.replace(/0/, 1);
 
     setTimeout(function(){
-      var new_raw, b64;
+      var font_array;
       woff.font_table(table_dir.index, table_data);
-      new_raw = woff.create();
-      setTimeout(function(){
-        that.EE.emit('font_glitched',new_raw,font);
-      }, 0);
+      font_array = woff.create();
+      setTimeout(function(){that.EE.emit('font_glitched',font_array,font);}, 0);
     }, 0);
   };
 
@@ -152,8 +151,6 @@
               xhr.overrideMimeType("text/plain; charset=x-user-defined");
             },
             context: this,
-            // complete: function(xhr) {
-            // },
             success: function(data, status, xhr){
               this.EE.emit('font_'+font.format+'_loaded', data, font);
             }
@@ -178,14 +175,43 @@
    * @public
    * @param {String} family Family name of WebFont.
    */
-  WOFFGlitch.prototype.load = function(family){
+  WOFFGlitch.prototype.load = function(family, callback){
     var protocol = 'https:' == window.location.protocol ? 'https:' : 'http:';
     var font_url = protocol + this._API_URL + '?family=' + family;
     this.font_family = family;
+    if (typeof(callback) !== "undefined") {
+      this.EE.on('woffglitch_callback', callback, this);
+    }
     $.ajax(font_url, {
       context: this,
-      success: function(data)  { this.EE.emit('font_css_loaded', data); },
+      success: function(data)  {
+        this.EE.emit('font_css_loaded', data);
+      },
       error:   function(status){ this.EE.emit('error', status); }
+    });
+  };
+
+  /**
+   * Get glitched webfont.
+   *
+   * @public
+   * @param {String} family Family name of WebFont.
+   */
+  WOFFGlitch.prototype.get = function(family, callback){
+    var protocol = 'http';
+    if (typeof(window )!== "undefined") protocol = 'https:' == window.location.protocol ? 'https:' : 'http:';
+    var font_url = protocol + this._API_URL + '?family=' + family;
+    this.font_family = family;
+    console.log('before ajax.');
+    $.ajax(font_url, {
+      context: this,
+      success: function(data)  {
+        callback(data);
+      },
+      error:   function(status){
+        console.log(status);
+        this.EE.emit('error', status);
+      }
     });
   };
 
