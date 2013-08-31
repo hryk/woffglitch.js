@@ -192,6 +192,21 @@
   };
 
   /**
+   * culculate padding length of table has given index.
+   *
+   * @private
+   */
+  WOFF.prototype._calc_table_padding_length = function(index){
+    var length = BinUtil.bytes_to_uint32(this.__table_dirs[index].orig_length);
+    if (length % 4 !== 0) {
+      return 4 - (length % 4);
+    }
+    else {
+      return 0;
+    }
+  };
+
+  /**
    * get table offset from current data.
    *
    * TODO
@@ -522,8 +537,20 @@
     return this.__font_tables[index];
   };
 
+  // adjust table dir to uncompressed data.
+  WOFF.prototype._populate_font_dir  =  function(index){
+    var raw;
+    var table_info = this.__table_dirs[index];
+    if (BinUtil.bytes_to_uint32(table_info.comp_length) !==
+        BinUtil.bytes_to_uint32(table_info.orig_length)) {
+      raw = this._get_uncompressed_font_table(index);
+      // offset
+      // length
+    }
+  };
+
   /**
-   * Get/Set font table data.
+   * Get/Set font table data. TODO: Caching.
    *
    * @public
    * @param {Integer} index Font table index.
