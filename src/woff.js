@@ -25,7 +25,7 @@
   }
 
   // Inherit from EventEmitter.
-  WOFF.prototype = EventEmitter.prototype;
+  WOFF.prototype.__proto__ = EventEmitter.prototype;
 
   /**
    * WOFF variable names and types.
@@ -239,6 +239,7 @@
    *
    */
   WOFF.prototype._update_table_offsets = function(){
+    console.log("yay! uncompressed all table!");
     var table_dir;
     for (var i=0;i < this.__table_dirs.length;i++) {
       table_dir = this.__table_dirs[i];
