@@ -8,6 +8,7 @@
    * @param {String} rawdata WOFF data.
    */
   function WOFF(rawdata){
+    // Members
     this.__data         = rawdata;
     this.__woff_header  = {};
     this.__table_dirs   = [];
@@ -15,17 +16,19 @@
     this.__ext_metadata = {};
     this.__private_data = {};
     this._modified      = false;
-    this.__parsed = false;
-    this._parse_header();
+    this.__parsed       = false;
+    this._events        = {};
+		this._maxListeners  = 10;
+    // Events
+    this.on('woff_parsed', this._update_table_offsets);
+    // Parse font data.
+    this._parse_woff_header();
+    this._parse_table_dirs();
     this._parse_font_tables();
-    // EventEmitter
-    this._events = {};
-		this._maxListeners = 10;
-    this.on('woff_parsed', this._update_table_offset);
-  }
+  };
 
   // Inherit from EventEmitter.
-  WOFF.prototype.__proto__ = EventEmitter.prototype;
+  WOFF.prototype = EventEmitter.prototype;
 
   /**
    * WOFF variable names and types.
@@ -70,27 +73,26 @@
   };
 
   /**
-   * Parsing WOFF header and Table Directories.
+   * Return a number of tables.
+   *
+   * @public
+   */
+  WOFF.prototype.num_tables = function(){
+    return BinUtil.bytes_to_uint16(this.__woff_header.num_tables);
+  };
+
+  /**
+   * Parsing WOFF header.
+   * File header with basic font type and version, along with offsets to
+   * metadata and private data blocks.
    *
    * @private
    */
-  WOFF.prototype._parse_header = function(){
+  WOFF.prototype._parse_woff_header = function(){
     var current = 0;
     // Parse header
     this.__woff_header = {
-      signature       : BinUtil.read_bytes(this.__data, current, 4),
-      // The flavor field corresponds to the "sfnt version" field found at the
-      // beginning of an sfnt file, indicating the type of font data contained.
-      // Although only fonts of type 0x00010000 (the version number 1.0 as a
-      // 16.16 fixed-point value, indicating TrueType glyph data) and 0x4F54544F
-      // (the tag 'OTTO', indicating CFF glyph data) are widely supported at
-      // present, it is not an error in the WOFF file if the flavor field
-      // contains a different value, indicating a WOFF-packaged version of a
-      // different sfnt flavor. (The value 0x74727565 'true' has been used for
-      // some TrueType-flavored fonts on Mac OS, for example.) Whether client
-      // software will actually support other types of sfnt font data is outside
-      // the scope of the WOFF specification, which simply describes how the
-      // sfnt is repackaged for Web use.
+      signature       : BinUtil.read_bytes(this.__data, current,      4),
       flavor          : BinUtil.read_bytes(this.__data, (current+=4), 4),
       length          : BinUtil.read_bytes(this.__data, (current+=4), 4),
       num_tables      : BinUtil.read_bytes(this.__data, (current+=4), 2),
@@ -107,10 +109,52 @@
       priv_offset     : BinUtil.read_bytes(this.__data, (current+=4), 4),
       priv_length     : BinUtil.read_bytes(this.__data, (current+=4), 4)
     };
+  };
+
+  /**
+   * Build WOFF header.
+   *
+   * @private
+   * @return {Array} WOFF header array.
+   *
+   */
+  WOFF.prototype._build_woff_header = function(){
+    var header = [];
+    // Update woff header values.
+    //
+    // - length: total size of woff file.
+    // - total_sfnt_size: Total size needed for the uncompressed font data,
+    // including the sfnt header, directory, and font tables (including
+    // padding).
+    header = header.concat(this.__woff_header.signature);
+    header = header.concat(this.__woff_header.flavor);
+    header = header.concat(this.__woff_header.length); // update
+    header = header.concat(this.__woff_header.num_tables);
+    header = header.concat(this.__woff_header.reserved);
+    header = header.concat(this.__woff_header.total_sfnt_size); // update
+    header = header.concat(this.__woff_header.major_version);
+    header = header.concat(this.__woff_header.minor_version);
+    header = header.concat(this.__woff_header.meta_offset);
+    header = header.concat(this.__woff_header.meta_length);
+    header = header.concat(this.__woff_header.meta_org_length);
+    header = header.concat(this.__woff_header.priv_offset);
+    header = header.concat(this.__woff_header.priv_length);
+
+    return header;
+  };
+
+  /**
+   * Parsing table directory.
+   * Directory of font tables, indicating the original size, compressed size
+   * and location of each table within the WOFF file.
+   *
+   * @private
+   *
+   */
+  WOFF.prototype._parse_table_dirs = function(){
+    var current = 40;
     // Reading table directories.
-    this.__table_dirs = [];
-    var num_tables    = BinUtil.bytes_to_uint16(this.__woff_header.num_tables);
-    for (var i=0; i < num_tables;i++) {
+    for (var i=0; i < this.num_tables();i++) {
       current += 4;
       this.__table_dirs.push({
         index:         i,
@@ -121,6 +165,81 @@
         orig_checksum: BinUtil.read_bytes(this.__data, (current+=4), 4)
       });
     }
+  };
+
+  /**
+   * Build Table directory.
+   *
+   * @private
+   * @return {Array} Table directory array.
+   *
+   */
+  WOFF.prototype._build_table_dir = function(){
+    var table_dir = [];
+    // To calculate the checkSum for the 'head' table which itself includes the
+    // checkSumAdjustment entry for the entire font, do the following:
+    //
+    // * Set the checkSumAdjustment to 0.
+    // * Calculate the checksum for all the tables including the 'head' table
+    //   and enter that value into the table directory.
+    // * Calculate the checksum for the entire font.
+    // * Subtract that value from the hex value B1B0AFBA.
+    // * Store the result in checkSumAdjustment.
+    for (var i=0; i<this.num_tables();i++) {
+      table_dir = table_dir.concat(this.__table_dirs[i].tag);
+      table_dir = table_dir.concat(this.__table_dirs[i].offset);
+      table_dir = table_dir.concat(this.__table_dirs[i].comp_length);
+      table_dir = table_dir.concat(this.__table_dirs[i].orig_length);
+      table_dir = table_dir.concat(this.__table_dirs[i].orig_checksum);
+    }
+    return table_dir;
+  };
+
+  /**
+   * Parse & Populate font tables.
+   *
+   * @private
+   *
+   */
+  WOFF.prototype._parse_font_tables = function(){
+    var raw, font_table_dir;
+
+    for (var i=0; i<this.num_tables(); i++) {
+      font_table_dir = this.table_dir(i);
+      // If compressed table, uncompress it.
+      if (font_table_dir.comp_length !== font_table_dir.orig_length) {
+        this._uncompress_font_table(i);
+      }
+      else {
+        this.__font_tables[i] = this._get_uncompressed_font_table(i);
+      }
+    }
+    // When all table are uncompressed, update table directory.
+    var that = this;
+    this.__parse_check = setInterval(function(){ that._check_uncompressed(); }, 10);
+
+    return this;
+  };
+
+  /**
+   * Build font tables.
+   *
+   * @private
+   * @return {Array} font table array.
+   *
+   */
+  WOFF.prototype._build_font_table = function(){
+    var font_table = [];
+    // Calculating offset of each font table.
+    //
+    // Calculating checksum of entire table.
+    //  => Update 'head' table's checkSumAdjustment.
+    // WOFF Header.
+    font_table = [];
+    for (var i=0;i<this.num_tables();i++) {
+      font_table = font_table.concat(BinUtil.read_bytes(this.__font_tables[i]));
+    }
+    return font_table;
   };
 
   /**
@@ -155,44 +274,28 @@
     console.log("======== END =========");
   };
 
-  WOFF.prototype._check_uncompressed = function(){
-    var num_tables = BinUtil.bytes_to_uint16(this.__woff_header.num_tables);
-    var table_info;
-    var uncompressed = true;
-    for (var i=0; i<this.__table_dirs.length; i++) {
-      table_info = this.table_dir(i);
-      if (table_info.comp_length !== table_info.orig_length)
-        uncompressed = false;
-    }
-    if (uncompressed) {
-      this.__parsed = true;
-      clearInterval(this.__parse_check);
-    }
-    this.emit('woff_parsed', this);
-  };
 
   /**
-   * Populate font tables.
+   * Check is WOFF uncompressed.
    *
    * @private
    *
    */
-  WOFF.prototype._parse_font_tables = function(){
-    var raw, font_table_dir;
-    var num_tables = BinUtil.bytes_to_uint16(this.__woff_header.num_tables);
-    // Get raw data.
-    for (var i=0; i<this.__table_dirs.length; i++) {
-      font_table_dir = this.table_dir(i);
-      if (font_table_dir.comp_length !== font_table_dir.orig_length) {
-        this._uncompress_font_table(i);
-      }
-      else {
-        this.__font_tables[i] = this._get_uncompressed_font_table(i);
-      }
+  WOFF.prototype._check_uncompressed = function(){
+    var table_info,
+    uncompressed = true;
+
+    for (var i=0; i<this.num_tables(); i++) {
+      table_info = this.table_dir(i);
+      if (table_info.comp_length !== table_info.orig_length)
+        uncompressed = false;
     }
-    var that = this;
-    this.__parse_check = setInterval(function(){ that._check_uncompressed(); }, 10);
-    return this;
+
+    if (uncompressed) {
+      this.__parsed = true;
+      window.clearInterval(this.__parse_check);
+      this.emit('woff_parsed');
+    }
   };
 
   /**
@@ -231,22 +334,19 @@
   };
 
   /**
-   * Update offset of font tables.
-   *
-   * TODO
+   * Update offset of font directory.
+   * 全てのテーブルがuncompressされた時に呼ばれる。
    *
    * @private
    *
    */
   WOFF.prototype._update_table_offsets = function(){
-    console.log("yay! uncompressed all table!");
     var table_dir;
-    for (var i=0;i < this.__table_dirs.length;i++) {
+    for (var i=0;i < this.num_tables();i++) {
       table_dir = this.__table_dirs[i];
-      console.log("---------"+ BinUtil.bytes_to_string(this.__table_dirs[i].tag) +"----------");
-      console.log("original offset:   " + BinUtil.bytes_to_uint32(this.__table_dirs[i].offset));
-      console.log("calculated offset: " + this._get_table_offsets(i, true));
+      this.__table_dirs[i].offset = BinUtil.uint32_to_bytes(this._get_table_offsets(i, true));
     }
+    this.emit("woff_ready");
   };
 
   /**
@@ -314,100 +414,11 @@
    */
   WOFF.prototype.create = function(){
     var font_array = [];
-    var tmp_offset, tmp_table_data, is_head_table;
-
-    // Calculating offset of each font table.
-    //
-    // - offset
-    //
     this._update_table_offsets();
-
-    // Update woff header values.
-    //
-    // - length
-    // - total_sfnt_size
-    //
-    this._update_header();
-
-    // Calculating checksum of entire table.
-    //  => Update 'head' table's checkSumAdjustment.
-    //
-    // this._calc_checksum_adjustment();
-
-    // WOFF Header.
-    font_array = font_array.concat(this.__woff_header["signature"]);
-    font_array = font_array.concat(this.__woff_header["flavor"]);
-    // length -> update
-    font_array = font_array.concat(this.__woff_header["length"]);
-    font_array = font_array.concat(this.__woff_header["num_tables"]);
-    font_array = font_array.concat(this.__woff_header["reserved"]);
-    // total_sfnt_size -> update
-    font_array = font_array.concat(this.__woff_header["total_sfnt_size"]);
-    font_array = font_array.concat(this.__woff_header["major_version"]);
-    font_array = font_array.concat(this.__woff_header["minor_version"]);
-    font_array = font_array.concat(this.__woff_header["meta_offset"]);
-    font_array = font_array.concat(this.__woff_header["meta_length"]);
-    font_array = font_array.concat(this.__woff_header["meta_org_length"]);
-    font_array = font_array.concat(this.__woff_header["priv_offset"]);
-    font_array = font_array.concat(this.__woff_header["priv_length"]);
-
-    var table_data, pad, pad_count, tmp_offset_padded;
-
-    // Font Table Dirs.
-    for (var i=0; i < this.__table_dirs.length;i++) {
-      tmp_offset     = this._get_table_offsets(i);
-      tmp_offset_padded = this._get_table_offsets(this.__table_dirs[i].index, true);
-      tmp_table_data = this.font_table(this.__table_dirs[i].index);
-      if (tmp_offset % 4 !== 0) {
-        console.log("Add padding to "+BinUtil.bytes_to_string(this.__table_dirs[i].tag));
-        pad_count = tmp_offset_padded - tmp_offset;
-        for (var k=0;k<pad_count;k++) {
-          tmp_table_data = tmp_table_data.concat([0x00]);
-        }
-      }
-      is_head_table  = (BinUtil.bytes_to_string(this.__table_dirs[i].tag) === 'head') ? true : false;
-      console.log(BinUtil.bytes_to_string(this.__table_dirs[i].tag)+": "+tmp_offset_padded+": "+tmp_offset);
-
-      font_array = font_array.concat(this.__table_dirs[i].tag);
-      font_array = font_array.concat(BinUtil.uint32_to_bytes(tmp_offset_padded));
-      font_array = font_array.concat(this.__table_dirs[i].orig_length);
-      font_array = font_array.concat(this.__table_dirs[i].orig_length);
-
-      // Checksumが合わない！
-      var chksum = this._calc_table_checksum(tmp_table_data, is_head_table);
-
-      console.log(BinUtil.bytes_to_string(this.__table_dirs[i].tag)+"("+
-                  BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_checksum)+"): "+chksum);
-
-      font_array = font_array.concat(BinUtil.uint32_to_bytes(chksum));
-    }
-
-    table_data = null;
-    pad = 0;
-    pad_count = 0;
-    tmp_offset_padded = 0;
-
-    for (var j=0; j < this.__table_dirs.length;j++) {
-      table_data = this.font_table(this.__table_dirs[j].index);
-      tmp_offset = this._get_table_offsets(this.__table_dirs[j].index);
-      font_array = font_array.concat(
-        BinUtil.read_bytes(this.font_table(this.__table_dirs[j].index)));
-      if (tmp_offset % 4 !== 0) {
-        tmp_offset_padded = this._get_table_offsets(this.__table_dirs[j].index, true);
-        pad_count = tmp_offset_padded - tmp_offset;
-        for (var y=0;y<pad_count;y++) {
-          font_array = font_array.concat([0x00]);
-        }
-      }
-    }
-
-    for (var x=0; x < font_array.length; x++) {
-      font_array[x] = "0x"+font_array[x].toString(16);
-    }
-
-    console.log("font_array size: " + font_array.length + ", header: " +
-                BinUtil.bytes_to_uint32(this.__woff_header["length"]));
-
+    font_array = font_array.concat(this._build_woff_header());
+    font_array = font_array.concat(this._build_table_dir());
+    font_array = font_array.concat(this._build_font_table());
+    console.log(font_array);
     return font_array;
   };
 
@@ -444,6 +455,13 @@
     return tables;
   };
 
+  /**
+   * Update font directory information adjust to current font table (except offset.).
+   *
+   * @private
+   * @param {Integer} index Font table index.
+   *
+   */
   WOFF.prototype._update_table_dir = function(index) {
     var table_info = this.table_dir(index);
     var raw_data   = BinUtil.read_bytes(this.__font_tables[index]);
@@ -455,6 +473,7 @@
     if (raw_data % 4 !== 0)
       raw_data = this._add_padding_to_data(raw_data);
       setTimeout(function(){
+        // Update table directory
         that.__table_dirs[index].orig_checksum = BinUtil.uint32_to_bytes(checksum);
         that.__table_dirs[index].comp_length   = BinUtil.uint32_to_bytes(length);
         that.__table_dirs[index].orig_length   = BinUtil.uint32_to_bytes(length);
@@ -462,6 +481,13 @@
       }, 0);
   };
 
+  /**
+   * Uncompress and read data from font table.
+   *
+   * @private
+   * @param {Integer} index Font table index.
+   *
+   */
   WOFF.prototype._uncompress_font_table = function(index) {
     var table_info = this.table_dir(index);
     var offset = table_info.offset;

@@ -11,7 +11,7 @@
     "glitch"
   ],
   "dependencies": {
-    "EventEmitter": "1.0.0",
+    "eventEmitter": "1.0.0",
     "js-base64": "2.1.2",
     "jquery": "2.0.3"
   },

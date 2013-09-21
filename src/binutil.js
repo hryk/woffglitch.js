@@ -20,7 +20,7 @@
      */
     read_bytes: function(bytestring, start, length, conv){
       if (typeof start  === 'undefined') start  = 0;
-      if (typeof conv  === 'undefined') conv  = false;
+      if (typeof conv  === 'undefined')  conv  = false;
       if (typeof length === 'undefined') length = bytestring.length;
       var str    = bytestring.substr(start, length),
           bytes  = [],
@@ -151,13 +151,22 @@
     * @param {Integer} value UInt32 value
     * @return {Array} ByteArray
     */
-    uint32_to_bytes: function(value){
+    uint32_to_bytes: function(value, conv){
       var bytes = [];
+      if (typeof conv  === 'undefined') conv  = false;
       value = parseInt(value, 10);
       bytes[0] = (value & 0xff000000) >> 24;
       bytes[1] = (value & 0x00ff0000) >> 16;
       bytes[2] = (value & 0x0000ff00) >> 8;
       bytes[3] = (value & 0x000000ff);
+      for (var j=0;j<bytes.length;j++) {
+        if (conv) {
+          bytes[j] = "0x"+bytes[j].toString(16);
+        }
+        else {
+          bytes[j] = bytes[j].toString(16);
+        }
+      }
       return bytes;
     },
     /**

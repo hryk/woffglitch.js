@@ -9,6 +9,16 @@
 (function(exports){
   'use strict';
 
+  // http://monsur.hossa.in/2012/07/20/utf-8-in-javascript.html
+
+  function encode_utf8( s ) {
+      return unescape( encodeURIComponent( s ) );
+  }
+
+  function decode_utf8( s ) {
+      return decodeURIComponent( escape( s ) );
+  }
+
   /**
    * WOFFGlitch class.
    *
@@ -20,15 +30,16 @@
     this._STYLE   = $('<style id="_woffglitch"></style>');
     this._STYLE.appendTo($('head'));
     // Listeners
-    this.EE = new EventEmitter();
-    this.EE.on('font_css_loaded',       this.load_woff,       this);
-    this.EE.on('font_css_loaded_error', this.error,           this);
-    this.EE.on('font_woff_loaded',      this.glitchers.woff,  this);
-    this.EE.on('font_glitched',         this.build_font_face, this);
+    this.on('font_css_loaded',       this.load_woff);
+    this.on('font_css_loaded_error', this.error);
+    this.on('font_woff_loaded',      this.glitchers.woff);
+    this.on('font_glitched',         this.build_font_face);
     // TODO: Support TTF, OTF.
-    // this.EE.on('font_truetype_loaded', this.log.error, this);
-    // this.EE.on('font_opentype_loaded', this.log.error, this);
+    // this.on('font_truetype_loaded', this.log.error, this);
+    // this.on('font_opentype_loaded', this.log.error, this);
   }
+
+  WOFFGlitch.prototype = EventEmitter.prototype;
 
   /**
    * Logger
@@ -44,6 +55,11 @@
     }
   };
 
+  /**
+   * Return data scheme of font.
+   *
+   * @private
+   */
   WOFFGlitch.prototype._data_scheme = function(raw, format){
     var media_type = '';
     switch (format) {
@@ -60,8 +76,8 @@
         this.log.error('_data_scheme: unsupported format "'+format+"'");
       break;
     }
-    console.log(raw);
-    var b64 = btoa(String.fromCharCode.apply(null, raw));
+    console.log(BinUtil.bytes_to_string(raw));
+    var b64 = Base64.toBase64(BinUtil.bytes_to_string(raw));
     // return "url('data:" + media_type + ";base64," + b64 + "')";
     return "data:" + media_type + ";base64," + b64 + "";
   };
@@ -70,16 +86,20 @@
    * Build font-face, insert font-face as a style element.
    *
    * @private
+   * @param {Array} raw raw font data.
+   * @param {Object} font font struct.
+   *
    */
   WOFFGlitch.prototype.build_font_face = function(raw, font){
-    var font_face = font.original_css.replace(/url\(.+?\)/, "url('"+this._data_scheme(raw, font.format)+"')");
     var family    = this.font_family;
-    this.log.debug(font_face);
+    var font_face = font.original_css.
+      replace(/url\(.+?\)/,"url('"+this._data_scheme(raw, font.format)+"')");
     var that = this;
+    console.log(font_face);
     $("<style></style>").text(font_face).appendTo($("head"));
     setTimeout(function(){
       $("html").css('font-family', family);
-      that.EE.emit('woffglitch_callback', raw, family, font.format);
+      that.emit('woffglitch_callback', raw, family, font.format);
     }, 0);
   };
 
@@ -96,19 +116,20 @@
    */
   WOFFGlitch.prototype.glitchers.woff = function(raw, font){
     var woff       = new WOFF(raw);
-    var table_dir  = woff.table_dir_by_tag('glyf');
-    var table_data = woff.font_table(table_dir.index);
-    var that       = this;
-
-    // Glitch!
-    // table_data = table_data.replace(/0/, 1);
-
-    setTimeout(function(){
-      var font_array;
-      woff.font_table(table_dir.index, table_data);
-      font_array = woff.create();
-      setTimeout(function(){that.EE.emit('font_glitched',font_array,font);}, 0);
-    }, 0);
+    var that = this;
+    woff.once("woff_ready", function(){
+      var table_dir  = woff.table_dir_by_tag('glyf');
+      var table_data = woff.font_table(table_dir.index);
+      // Glitch!
+      // table_data = table_data.replace(/0/, 1);
+      setTimeout(function(){
+        woff.font_table(table_dir.index, table_data);
+        var font_array = woff.create();
+        setTimeout(function(){
+          that.emit('font_glitched',font_array ,font);
+        }, 0);
+      }, 0);
+    });
   };
 
   /**
@@ -152,7 +173,7 @@
             },
             context: this,
             success: function(data, status, xhr){
-              this.EE.emit('font_'+font.format+'_loaded', data, font);
+              this.emit('font_'+font.format+'_loaded', data, font);
             }
           });
         }
@@ -179,15 +200,13 @@
     var protocol = 'https:' == window.location.protocol ? 'https:' : 'http:';
     var font_url = protocol + this._API_URL + '?family=' + family;
     this.font_family = family;
-    if (typeof(callback) !== "undefined") {
-      this.EE.on('woffglitch_callback', callback, this);
-    }
+    if (typeof(callback) !== "undefined")
+      this.on('woffglitch_callback', callback, this);
+
     $.ajax(font_url, {
       context: this,
-      success: function(data)  {
-        this.EE.emit('font_css_loaded', data);
-      },
-      error:   function(status){ this.EE.emit('error', status); }
+      success: function(data) { this.emit('font_css_loaded', data); },
+      error:   function(status){ this.emit('error', status); }
     });
   };
 
@@ -210,7 +229,7 @@
       },
       error:   function(status){
         console.log(status);
-        this.EE.emit('error', status);
+        this.emit('error', status);
       }
     });
   };
