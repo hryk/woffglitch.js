@@ -418,6 +418,9 @@
     font_array = font_array.concat(this._build_woff_header());
     font_array = font_array.concat(this._build_table_dir());
     font_array = font_array.concat(this._build_font_table());
+    for (var x=0; x < font_array.length; x++) {
+      font_array[x] = "0x"+font_array[x].toString(16);
+    }
     console.log(font_array);
     return font_array;
   };

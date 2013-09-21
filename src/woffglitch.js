@@ -76,8 +76,7 @@
         this.log.error('_data_scheme: unsupported format "'+format+"'");
       break;
     }
-    console.log(BinUtil.bytes_to_string(raw));
-    var b64 = Base64.toBase64(BinUtil.bytes_to_string(raw));
+    var b64 = btoa(String.fromCharCode.apply(null, raw));
     // return "url('data:" + media_type + ";base64," + b64 + "')";
     return "data:" + media_type + ";base64," + b64 + "";
   };
