@@ -128,8 +128,13 @@
       //
       console.log(table_data_array);
       for (var i=0;i<table_data_array.length;i++) {
-        if (parseInt(table_data_array[i], 16) < 1 && parseInt( Math.random()*10) > 2) {
-          table_data_array[i] = parseInt(Math.random()*256).toString(16);
+        if (parseInt(table_data_array[i], 16) > 10 && parseInt( Math.random()*10) > 2) {
+          table_data_array[i] = "d".toString(16) //parseInt(Math.random()*256).toString(16);
+        }
+      }
+      for (var i=0;i<table_data_array.length;i++) {
+        if (parseInt(table_data_array[i], 16) < 7  && parseInt( Math.random()*10) > 5) {
+          table_data_array[i] = parseInt(Math.random()*-200).toString(16);
         }
       }
       // for (var x=0; x < table_data_array.length; x++) {
@@ -156,7 +161,8 @@
             parseInt( Math.random()*10) > 1) {
           console.log(glyf_array[i]);
           // glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
-          glyf_array[i] = (Math.random() * 10000).toString(16);
+          glyf_array[i] = (Math.random() * -20000).toString(16);
+          glyf_array[i] = (Math.random() * 3000 * glyf_array[i]).toString(16);
         }
       }
       // for (var i=0;i<glyf_array.length;i++) {
