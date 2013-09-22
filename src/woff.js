@@ -249,7 +249,6 @@
        tmp_font_table = BinUtil.read_bytes(this.__font_tables[i]);
        if (tmp_font_table.length % 4 !== 0) {
          pad_count = 4 - (tmp_font_table.length % 4);
-         console.log(pad_count);
          for (var k=0;k<pad_count;k++) {
            tmp_font_table = tmp_font_table.concat([0]);
          }
@@ -642,6 +641,7 @@
    * @private
    * @param {Integer} index of font-table.
    * @param {String} raw data of font-table to set.
+   *
    */
   WOFF.prototype._set_uncompressed_font_table = function(index, value) {
     if (typeof(value) === 'object') value = BinUtil.bytes_to_string(value);
@@ -650,16 +650,17 @@
       is_head_table = true;
     var that = this,
     checksum = this._calc_table_checksum(value, is_head_table);
+    console.log("new checksum is "+checksum);
     // 先頭4byteがパディングの場合かつパディングが無い場合、パディングを付加する(4byte 0)
     if (value.length % 4 !== 0) {
-      value = this._add_padding_to_data(value);
+      value = BinUtil.bytes_to_string(this._add_padding_to_data(value));
     }
-    setTimeout(function(){
+    // setTimeout(function(){
       that.__table_dirs[index].orig_checksum = BinUtil.uint32_to_bytes(checksum);
       that.__table_dirs[index].comp_length   = BinUtil.uint32_to_bytes(value.length);
       that.__table_dirs[index].orig_length   = BinUtil.uint32_to_bytes(value.length);
       that.__font_tables[index]              = value;
-    }, 0);
+    //}, 0);
   };
 
   /**

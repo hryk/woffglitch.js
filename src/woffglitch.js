@@ -12,11 +12,11 @@
   // http://monsur.hossa.in/2012/07/20/utf-8-in-javascript.html
 
   function encode_utf8( s ) {
-      return unescape( encodeURIComponent( s ) );
+    return unescape( encodeURIComponent( s ) );
   }
 
   function decode_utf8( s ) {
-      return decodeURIComponent( escape( s ) );
+    return decodeURIComponent( escape( s ) );
   }
 
   /**
@@ -97,7 +97,7 @@
     var that = this;
     $("<style></style>").text(font_face).appendTo($("head"));
     setTimeout(function(){
-      $("html").css('font-family', family);
+      $("body").css('font-family', family);
       that.emit('woffglitch_callback', raw, family, font.format);
     }, 0);
   };
@@ -117,12 +117,52 @@
     var woff       = new WOFF(raw);
     var that = this;
     woff.once("woff_ready", function(){
-      var table_dir  = woff.table_dir_by_tag('glyf');
+      var table_dir  = woff.table_dir_by_tag('hmtx');
       var table_data = woff.font_table(table_dir.index);
+      var table_data_array = BinUtil.read_bytes(table_data);
+      // Fword: 16-bit signed integer that describes a quantity in FUnits, the
+      //        smallest measurable distance in em space.
+      //
+      //  numofcontors = 0  : simple
+      //  numofcontors = -1 : compound
+      //
+      console.log(table_data_array);
+      for (var i=0;i<table_data_array.length;i++) {
+        if (parseInt(table_data_array[i], 16) < 1 && parseInt( Math.random()*10) > 5) {
+          table_data_array[i] = parseInt(Math.random()*256).toString(16);
+        }
+      }
+      // for (var x=0; x < table_data_array.length; x++) {
+      //   table_data_array[x] = "0x"+table_data_array[x].toString(16);
+      // }
+
       // Glitch!
-      // table_data = table_data.replace(/0/, 1);
+      // table_data = table_data.replace(/0(\d{2}){4}/g, '01z11111');
+      table_data = BinUtil.bytes_to_string(table_data_array);
+      // table_data = table_data.replace(/0/g, '1');
+      // table_data = table_data.replace(/[a-z]./g, '01'+parseInt(Math.random() * 10)+'2');
+      // table_data = table_data.replace(/f/g, '3');
+      // for (var i=0;i<1000;i++) {
+      //   table_data[parseInt(Math.random() * table_data.length)] = '100000000';
+      // }
+      // table_data = table_data.replace(/[0-9]/g, '5');
+
+      // Glyf
+      var glyf_table_dir  = woff.table_dir_by_tag('glyf');
+      var glyf_array = BinUtil.read_bytes(woff.font_table(glyf_table_dir.index));
+      for (var i=0;i<glyf_array.length;i++) {
+        if (parseInt(glyf_array[i], 16) > 100 &&
+            parseInt(glyf_array[i], 16) < 250 &&
+            parseInt( Math.random()*10) > 2) {
+          console.log(glyf_array[i]);
+          // glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
+          glyf_array[i] = (Math.random() * 7000).toString(16);
+        }
+      }
+
       setTimeout(function(){
         woff.font_table(table_dir.index, table_data);
+        woff.font_table(glyf_table_dir.index, BinUtil.bytes_to_string(glyf_array));
         var font_array = woff.create();
         setTimeout(function(){
           that.emit('font_glitched',font_array ,font);
