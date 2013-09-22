@@ -61,6 +61,9 @@
     }
   };
 
+  WOFF.prototype.__woff_header_bytes = 44;
+  WOFF.prototype.__table_dir_bytes   = 20;
+
   /**
    * Return flavor as String
    *
@@ -120,6 +123,11 @@
    */
   WOFF.prototype._build_woff_header = function(){
     var header = [];
+    var length = this.__table_dir_bytes*this.num_tables()+
+      this.__woff_header_bytes;
+    for (var i=0;i<this.num_tables();i++) {
+      length += this.__font_tables[i].length;
+    }
     // Update woff header values.
     //
     // - length: total size of woff file.
@@ -128,10 +136,10 @@
     // padding).
     header = header.concat(this.__woff_header.signature);
     header = header.concat(this.__woff_header.flavor);
-    header = header.concat(this.__woff_header.length); // update
+    header = header.concat(this.__woff_header.length);
     header = header.concat(this.__woff_header.num_tables);
     header = header.concat(this.__woff_header.reserved);
-    header = header.concat(this.__woff_header.total_sfnt_size); // update
+    header = header.concat(this.__woff_header.total_sfnt_size);
     header = header.concat(this.__woff_header.major_version);
     header = header.concat(this.__woff_header.minor_version);
     header = header.concat(this.__woff_header.meta_offset);
@@ -229,15 +237,23 @@
    *
    */
   WOFF.prototype._build_font_table = function(){
-    var font_table = [];
+    var tmp_font_table, pad_count,
+    font_table = [];
     // Calculating offset of each font table.
     //
     // Calculating checksum of entire table.
     //  => Update 'head' table's checkSumAdjustment.
     // WOFF Header.
-    font_table = [];
     for (var i=0;i<this.num_tables();i++) {
-      font_table = font_table.concat(BinUtil.read_bytes(this.__font_tables[i]));
+       tmp_font_table = BinUtil.read_bytes(this.__font_tables[i]);
+       if (tmp_font_table.length % 4 !== 0) {
+         pad_count = 4 - (tmp_font_table.length % 4);
+         console.log(pad_count);
+         for (var k=0;k<pad_count;k++) {
+           tmp_font_table = tmp_font_table.concat([0]);
+         }
+       }
+       font_table = font_table.concat(tmp_font_table);
     }
     return font_table;
   };
@@ -308,27 +324,31 @@
    */
   WOFF.prototype._update_header = function(){
     // update length
+    //
     // WOFF header + table dir + font table + (ExtendedMetadata + PrivateData)
     // update total_sfnt_size
     // WOFF header + table dir + font table (uncompressed) + (ExtendedMetadata + PrivateData)
     // Total size needed for the uncompressed font data, including the sfnt
     // header, directory, and font tables (including padding).
-    var woff_length     = 44 + (this.__table_dirs.length * 16);
-    var total_sfnt_size = 12 + (this.__table_dirs.length * 16) + 4;
+    //
+    var tmp_table_length,
+    woff_length     = 44 + (this.num_tables() * 16),
+    total_sfnt_size = 12 + (this.num_tables() * 16);
 
-    for (var i=0;i<this.__table_dirs.length;i++) {
-      woff_length += BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length);
-      var pad = (BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length)) % 4;
-      if (pad !== 0) {
-        total_sfnt_size += BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length) + pad;
+    for (var i=0;i<this.num_tables();i++) {
+      tmp_table_length = this.__font_tables[i].length;
+
+      if (this._calc_table_padding_length(i) > 0) {
+        tmp_table_length += this._calc_table_padding_length(i);
       }
-      else {
-        total_sfnt_size += BinUtil.bytes_to_uint32(this.__table_dirs[i].orig_length);
-      }
+
+      total_sfnt_size += tmp_table_length;
+      woff_length     += tmp_table_length;
     }
 
     console.log("length: "   +woff_length);
     console.log("sfnt_size: "+total_sfnt_size);
+
     this.__woff_header.length          = BinUtil.uint32_to_bytes(woff_length);
     this.__woff_header.total_sfnt_size = BinUtil.uint32_to_bytes(total_sfnt_size);
   };
@@ -344,6 +364,7 @@
     var table_dir;
     for (var i=0;i < this.num_tables();i++) {
       table_dir = this.__table_dirs[i];
+      // Padding有りlength
       this.__table_dirs[i].offset = BinUtil.uint32_to_bytes(this._get_table_offsets(i, true));
     }
     this.emit("woff_ready");
@@ -355,7 +376,7 @@
    * @private
    */
   WOFF.prototype._calc_table_padding_length = function(index){
-    var length = BinUtil.bytes_to_uint32(this.__table_dirs[index].orig_length);
+    var length = this.__font_tables[index].length;
     if (length % 4 !== 0) {
       return 4 - (length % 4);
     }
@@ -367,7 +388,6 @@
   /**
    * get table offset from current data.
    *
-   * TODO
    *
    * @private
    *
@@ -379,7 +399,7 @@
         offset = BinUtil.bytes_to_uint32(this.__table_dirs[i].offset);
       }
       else {
-        offset += BinUtil.bytes_to_uint32(this.__table_dirs[i-1].orig_length);
+        offset += this.__font_tables[i-1].length;
       }
     }
     if (typeof(padded) !== "undefined" && padded === true) {
@@ -389,19 +409,23 @@
     return offset;
   };
 
+  /**
+   * calculate checksum adjustment with following procedure:
+   *
+   * - Calculate the checksum for all the tables including the 'head' table and
+   * - enter that value into the table directory.
+   * - Calculate the checksum for the entire font.
+   * - Subtract that value from the hex value B1B0AFBA.
+   * - Store the result in checkSumAdjustment.
+   *
+   * @private
+   *
+   */
   WOFF.prototype._calc_checksum_adjustment = function(){
     // * Set the head table's checkSumAdjustment to 0.
     var head_table      = this.table_dir_by_tag('head');
     var head_table_data = this.font_table(head_table.index);
 
-    // * Calculate the checksum for all the tables including the 'head' table and
-
-    // * enter that value into the table directory.
-
-    // * Calculate the checksum for the entire font.
-
-    // * Subtract that value from the hex value B1B0AFBA.
-    // * Store the result in checkSumAdjustment.
   };
 
   /**
@@ -414,6 +438,9 @@
    */
   WOFF.prototype.create = function(){
     var font_array = [];
+    // - length, total_sfnt_size
+    this._update_header();
+    // -
     this._update_table_offsets();
     font_array = font_array.concat(this._build_woff_header());
     font_array = font_array.concat(this._build_table_dir());
@@ -473,15 +500,16 @@
     var that = this,
     checksum = this._calc_table_checksum(raw_data, is_head_table),
     length   = raw_data.length;
-    if (raw_data % 4 !== 0)
+    if (raw_data % 4 !== 0) {
       raw_data = this._add_padding_to_data(raw_data);
-      setTimeout(function(){
-        // Update table directory
-        that.__table_dirs[index].orig_checksum = BinUtil.uint32_to_bytes(checksum);
-        that.__table_dirs[index].comp_length   = BinUtil.uint32_to_bytes(length);
-        that.__table_dirs[index].orig_length   = BinUtil.uint32_to_bytes(length);
-        that.__font_tables[index]              = BinUtil.bytes_to_string(raw_data);
-      }, 0);
+    }
+    setTimeout(function(){
+      // Update table directory
+      that.__table_dirs[index].orig_checksum = BinUtil.uint32_to_bytes(checksum);
+      that.__table_dirs[index].comp_length   = BinUtil.uint32_to_bytes(length);
+      that.__table_dirs[index].orig_length   = BinUtil.uint32_to_bytes(length);
+      that.__font_tables[index]              = BinUtil.bytes_to_string(raw_data);
+    }, 0);
   };
 
   /**

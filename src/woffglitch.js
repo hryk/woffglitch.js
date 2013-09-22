@@ -93,8 +93,8 @@
     var family    = this.font_family;
     var font_face = font.original_css.
       replace(/url\(.+?\)/,"url('"+this._data_scheme(raw, font.format)+"')");
-    var that = this;
     console.log(font_face);
+    var that = this;
     $("<style></style>").text(font_face).appendTo($("head"));
     setTimeout(function(){
       $("html").css('font-family', family);
