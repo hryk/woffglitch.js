@@ -128,7 +128,7 @@
       //
       console.log(table_data_array);
       for (var i=0;i<table_data_array.length;i++) {
-        if (parseInt(table_data_array[i], 16) < 1 && parseInt( Math.random()*10) > 5) {
+        if (parseInt(table_data_array[i], 16) < 1 && parseInt( Math.random()*10) > 2) {
           table_data_array[i] = parseInt(Math.random()*256).toString(16);
         }
       }
