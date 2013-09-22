@@ -151,14 +151,23 @@
       var glyf_table_dir  = woff.table_dir_by_tag('glyf');
       var glyf_array = BinUtil.read_bytes(woff.font_table(glyf_table_dir.index));
       for (var i=0;i<glyf_array.length;i++) {
-        if (parseInt(glyf_array[i], 16) > 100 &&
+        if (parseInt(glyf_array[i], 16) > 200 &&
             parseInt(glyf_array[i], 16) < 250 &&
-            parseInt( Math.random()*10) > 2) {
+            parseInt( Math.random()*10) > 1) {
           console.log(glyf_array[i]);
           // glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
-          glyf_array[i] = (Math.random() * 7000).toString(16);
+          glyf_array[i] = (Math.random() * 10000).toString(16);
         }
       }
+      // for (var i=0;i<glyf_array.length;i++) {
+      //   if (parseInt(glyf_array[i], 16) > 100 &&
+      //       parseInt(glyf_array[i], 16) < 250 &&
+      //       parseInt( Math.random()*10) > 2) {
+      //     console.log(glyf_array[i]);
+      //     // glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
+      //     glyf_array[i] = (Math.random() * 7000).toString(16);
+      //   }
+      // }
 
       setTimeout(function(){
         woff.font_table(table_dir.index, table_data);
