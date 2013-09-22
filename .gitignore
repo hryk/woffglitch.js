@@ -1,3 +1,5 @@
+bower_components
+
 *~
 *.sw[a-z]
 .DS_Store

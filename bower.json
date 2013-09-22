@@ -1,0 +1,28 @@
+{
+  "name": "woffglitch.js",
+  "version": "0.0.0",
+  "homepage": "https://github.com/hryk/woffglitch.js",
+  "authors": [
+    "Hiroyuki Nakamura <hiroyuki@1vq9.com>"
+  ],
+  "description": "glitch WOFF.",
+  "main": "src/woffglitch.js",
+  "keywords": [
+    "glitch"
+  ],
+  "dependencies": {
+    "eventEmitter": "1.0.0",
+    "js-base64": "2.1.2",
+    "bootstrap": "3.0.0",
+    "jquery": "2.0.3"
+  },
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ]
+}

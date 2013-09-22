@@ -1,30 +1,62 @@
 <!doctype html>
 <html>
   <head>
+    <meta charset="utf-8">
     <title>WOFFGlitch Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CSS -->
+    <link href="../bower_components/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script type="javascript">
+    </script>
  </head>
  <body>
-  <h1 class="glitch">Webfont Glitch</h1>
-  <a href="#" id="webfont_download">Download Glitched Font</a>
-  <script src="//ajax.googleapis.com/ajax/libs/jquery/1.7.2/jquery.min.js"></script>
-  <script>window.jQuery || document.write('<script src="js/libs/jquery-1.7.2.min.js"><\/script>')</script>
-  <script src="../lib/EventEmitter.js"></script>
-  <script src="../lib/base64.js"></script>
-  <script src="../lib/rawinflate.js"></script>
-  <script src="../lib/rawdeflate.js"></script>
-  <script src="../src/woff.js"></script>
-  <script src="../src/woffglitch.js"></script>
-  <script src="../src/binutil.js"></script>
-  <script type="text/javascript">
-    var wg = new WOFFGlitch('//webfontcssproxy.herokuapp.com/css');
-    wg.load('Audiowide', function(glitched_woff, family_name, mime_type){
-      // TODO: Fix download link generation.
-      // var font_file = new Blob([glitched_woff], {type: "application/octet-binary"});
-      // var blobURL = window.URL.createObjectURL(font_file);
-      // $('#webfont_download')[0].download = 'glitched.woff';
-      // $('#webfont_download').attr('href', blobURL);
-      // $('#webfont_download')[0].dataset.downloadurl = ["application/octet-binary", 'glitch.woff', blobURL].join(":");
-    });
-  </script>
+   <div class="container">
+     <div class="panel">
+       <p class="glitch">Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem
+       Ipsum has been the industry's standard dummy text ever since the 1500s, when an unknown printer
+       took a galley of type and scrambled it to make a type specimen book. It has survived not only five
+       centuries, but also the leap into electronic typesetting, remaining essentially unchanged. It was
+       popularised in the 1960s with the release of Letraset sheets containing Lorem Ipsum passages, and
+       more recently with desktop publishing software like Aldus PageMaker including versions of Lorem
+       Ipsum.</p>
+     </div>
+     <div class="panel">
+       <div class="dropdown" id="fontmenu">
+         <a role="button" data-toggle="dropdown" href="#">Select Webfont
+           <span class="caret"></span></a>
+         <ul class="dropdown-menu" role="menu" aria-labelledby="dLabel">
+           <li><a href="#">Audiowide</a></li>
+           <!--<li><a href="#">Railway</a></li>-->
+           <li><a href="#">Chango</a></li>
+           <li><a href="#">Monofett</a></li>
+           <li><a href="#">Cantora+One</a></li>
+           <li><a href="#">Spirax</a></li>
+           <li><a href="#">Parisienne</a></li>
+           <li><a href="#">Clicker+Script</a></li>
+         </ul>
+       </div>
+     </div>
+     <!--  <a href="#" id="webfont_download">Download Glitched Font</a>-->
+   </div>
+   <script src="//ajax.googleapis.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
+   <script>window.jQuery || document.write('<script src="bower_components/jquery/jquery.min.js"><\/script>')</script>
+   <script src="../bower_components/bootstrap/dist/js/bootstrap.js"></script>
+   <script src="../bower_components/eventEmitter/EventEmitter.js"></script>
+   <script src="../bower_components/js-base64/base64.js"></script>
+   <script src="../lib/rawinflate.js"></script>
+   <script src="../lib/rawdeflate.js"></script>
+   <script src="../src/woff.js"></script>
+   <script src="../src/woffglitch.js"></script>
+   <script src="../src/binutil.js"></script>
+   <script type="text/javascript">
+     // var api_key = "AIzaSyB76u1U7X6CX7Tb4Fdc08JEOPvWjis8q9c";
+     var wg = new WOFFGlitch('//webfontcssproxy.herokuapp.com/css');
+     // var url = "https://www.googleapis.com/webfonts/v1/webfonts?key=" + api_key + "&sort=popularity";
+     $("#fontmenu li a").click(function(){
+      wg.load($(this).text(), function(glitched_woff, family_name, mime_type){
+        console.log("hogehoge");
+      });
+     });
+   </script>
  </body>
 </html>
