@@ -128,6 +128,7 @@
     for (var i=0;i<this.num_tables();i++) {
       length += this.__font_tables[i].length;
     }
+    console.log("length: "+length);
     // Update woff header values.
     //
     // - length: total size of woff file.
@@ -332,7 +333,7 @@
     // header, directory, and font tables (including padding).
     //
     var tmp_table_length,
-    woff_length     = 44 + (this.num_tables() * 16),
+    woff_length     = this.__table_dir_bytes*this.num_tables()+this.__woff_header_bytes,
     total_sfnt_size = 12 + (this.num_tables() * 16);
 
     for (var i=0;i<this.num_tables();i++) {
