@@ -2,10 +2,6 @@
 //
 // Dependencies : base64.js, EventEmitter.js, jQuery.js, rawdeflate.js, rawinflate.js
 //
-// * _と__について
-//  privateなデータは__, privateなmethodは_を接頭辞に持っている。
-//
-
 (function(exports){
   'use strict';
 
@@ -27,10 +23,9 @@
   function WOFFGlitch(api_url){
     this._loaded  = [];
     this._API_URL = api_url || '//fonts.googleapis.com/css';
-    this._STYLE   = $('<style id="_woffglitch"></style>');
-    this._STYLE.appendTo($('head'));
     // Listeners
-    this.on('font_css_loaded',       this.load_woff);
+    this.on('font_css_loaded',       this.load_font_from_css);
+    this.on('font_direct_loaded',    this.load_font);
     this.on('font_css_loaded_error', this.error);
     this.on('font_woff_loaded',      this.glitchers.woff);
     this.on('font_glitched',         this.build_font_face);
@@ -88,12 +83,20 @@
    * @param {Array} raw raw font data.
    * @param {Object} font font struct.
    *
+   * @font-face {
+   *   font-family: 'Audiowide';
+   *   font-style: normal;
+   *   font-weight: 400;
+   *   src: local('Audiowide'), local('Audiowide-Regular'),
+   *   url(http://themes.googleusercontent.com/static/fonts/audiowide/v1/8XtYtNKEyyZh481XVWfVOrO3LdcAZYWl9Si6vvxL-qU.woff)
+   *   format('woff');
+   *  }
+   *
    */
   WOFFGlitch.prototype.build_font_face = function(raw, font){
     var family    = this.font_family;
     var font_face = font.original_css.
       replace(/url\(.+?\)/,"url('"+this._data_scheme(raw, font.format)+"')");
-    console.log(font_face);
     var that = this;
     $("<style></style>").text(font_face).appendTo($("head"));
     setTimeout(function(){
@@ -120,13 +123,6 @@
       var table_dir  = woff.table_dir_by_tag('hmtx');
       var table_data = woff.font_table(table_dir.index);
       var table_data_array = BinUtil.read_bytes(table_data);
-      // Fword: 16-bit signed integer that describes a quantity in FUnits, the
-      //        smallest measurable distance in em space.
-      //
-      //  numofcontors = 0  : simple
-      //  numofcontors = -1 : compound
-      //
-      console.log(table_data_array);
       for (var i=0;i<table_data_array.length;i++) {
         if (parseInt(table_data_array[i], 16) > 10 && parseInt( Math.random()*10) > 2) {
           table_data_array[i] = "d".toString(16) //parseInt(Math.random()*256).toString(16);
@@ -137,44 +133,21 @@
           table_data_array[i] = parseInt(Math.random()*-200).toString(16);
         }
       }
-      // for (var x=0; x < table_data_array.length; x++) {
-      //   table_data_array[x] = "0x"+table_data_array[x].toString(16);
-      // }
-
-      // Glitch!
-      // table_data = table_data.replace(/0(\d{2}){4}/g, '01z11111');
       table_data = BinUtil.bytes_to_string(table_data_array);
-      // table_data = table_data.replace(/0/g, '1');
-      // table_data = table_data.replace(/[a-z]./g, '01'+parseInt(Math.random() * 10)+'2');
-      // table_data = table_data.replace(/f/g, '3');
-      // for (var i=0;i<1000;i++) {
-      //   table_data[parseInt(Math.random() * table_data.length)] = '100000000';
-      // }
-      // table_data = table_data.replace(/[0-9]/g, '5');
-
       // Glyf
       var glyf_table_dir  = woff.table_dir_by_tag('glyf');
       var glyf_array = BinUtil.read_bytes(woff.font_table(glyf_table_dir.index));
       for (var i=0;i<glyf_array.length;i++) {
-        if (parseInt(glyf_array[i], 16) > 200 &&
+        if (
+            parseInt(glyf_array[i], 16) > 190 &&
             parseInt(glyf_array[i], 16) < 250 &&
             parseInt( Math.random()*10) > 1) {
-          console.log(glyf_array[i]);
-          // glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
+          glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
           glyf_array[i] = (Math.random() * -20000).toString(16);
-          glyf_array[i] = (Math.random() * 3000 * glyf_array[i]).toString(16);
+          glyf_array[i] = (parseInt(glyf_array[i], 16) * parseInt(glyf_array[i+1], 16)).toString(16);
+          glyf_array[i] = (parseInt(glyf_array[i-1], 16) * parseInt(glyf_array[i], 16)).toString(16);
         }
       }
-      // for (var i=0;i<glyf_array.length;i++) {
-      //   if (parseInt(glyf_array[i], 16) > 100 &&
-      //       parseInt(glyf_array[i], 16) < 250 &&
-      //       parseInt( Math.random()*10) > 2) {
-      //     console.log(glyf_array[i]);
-      //     // glyf_array[i] = (parseInt(glyf_array[i], 16) * Math.random() * 1000).toString(16);
-      //     glyf_array[i] = (Math.random() * 7000).toString(16);
-      //   }
-      // }
-
       setTimeout(function(){
         woff.font_table(table_dir.index, table_data);
         woff.font_table(glyf_table_dir.index, BinUtil.bytes_to_string(glyf_array));
@@ -186,20 +159,30 @@
     });
   };
 
+  // WOFFGlitch.prototype.load_font = function(data) {
+  //   var font = {
+  //     'family': this.family,
+  //     'url':
+  //   };
+  // };
+
   /**
    * Parse @font-face, then load font with ajax.
    *
    * @public
    * @param {String} @font-face text.
    */
-  WOFFGlitch.prototype.load_woff = function(data) {
-    var font = {};
+  WOFFGlitch.prototype.load_font_from_css = function(data) {
+    var font = {
+      'family': '',
+      'original_css': '',
+      'format': ''
+    };
     var pattern = {
       family: /\s*font-family:\s+?'(.+?)';/,
       url   : /,\s*url\('*(.+?)'*\)/,
       format: /format\('*(.+?)'*\)/
     };
-
     // Parsing Font Family
     if (pattern.family.test(data)) {
       var found_family = data.match(pattern.family);
@@ -220,7 +203,7 @@
           this.log.debug('format: '+font.format);
 
           // Load font with AJAX.
-          // FIXME: depend on jQuery. Rewrite with plain XHR
+          // FIXME: depends on jQuery. Rewrite with plain XHR
           $.ajax(font.url, {
             beforeSend: function(xhr){
               xhr.overrideMimeType("text/plain; charset=x-user-defined");
@@ -251,15 +234,28 @@
    * @param {String} family Family name of WebFont.
    */
   WOFFGlitch.prototype.load = function(family, callback){
-    var protocol = 'https:' == window.location.protocol ? 'https:' : 'http:';
-    var font_url = protocol + this._API_URL + '?family=' + family;
+    var protocol, font_url, capture, mode;
+
+    if (/\.(ttf|woff)$/.test(family)) {
+      font_url = family;
+      capture  = /.*\/(.+?)\.(ttf|woff)$/.exec(font_url);
+      family   = capture[1];
+      mode     = 'direct';
+    }
+    else {
+      protocol = 'https:' == window.location.protocol ? 'https:' : 'http:';
+      font_url = protocol + this._API_URL + '?family=' + family;
+      mode     = 'css';
+    }
+
     this.font_family = family;
-    if (typeof(callback) !== "undefined")
+
+    if (typeof(callback) !== 'undefined')
       this.on('woffglitch_callback', callback, this);
 
     $.ajax(font_url, {
       context: this,
-      success: function(data) { this.emit('font_css_loaded', data); },
+      success: function(data) { this.emit('font_'+mode+'_loaded', data); },
       error:   function(status){ this.emit('error', status); }
     });
   };
