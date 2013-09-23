@@ -3,6 +3,10 @@ WOFFGlitch
 
 Glitch web fonts (.woff)
 
+### DEMO
+
+http://www.1vq9.com/woffglitch/demo/
+
 ### Synopsys
 
     var woff_glitch = new WOFFGlitch();
