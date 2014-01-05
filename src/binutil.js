@@ -59,15 +59,12 @@
       switch(type){
         case "string":
           return BinUtil.bytes_to_string(bytes);
-        break;
         case "uint32":
           return BinUtil.bytes_to_uint32(bytes);
-        break;
         case "uint16":
           return BinUtil.bytes_to_uint16(bytes);
         default:
           throw new TypeError("bytes_to could not handle type '"+type+"'");
-        break;
       }
       return false;
     },
@@ -83,15 +80,12 @@
       switch(type){
         case "string":
           return BinUtil.read_bytes(value, 0, value.length);
-        break;
         case "uint32":
           return BinUtil.uint32_to_bytes(value);
-        break;
         case "uint16":
           return BinUtil.uint16_to_bytes(value);
         default:
           throw new TypeError("bytes_from could not handle type '"+type+"'");
-        break;
       }
       return false;
     },

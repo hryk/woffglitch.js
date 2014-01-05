@@ -123,12 +123,13 @@
       var table_dir  = woff.table_dir_by_tag('hmtx');
       var table_data = woff.font_table(table_dir.index);
       var table_data_array = BinUtil.read_bytes(table_data);
-      for (var i=0;i<table_data_array.length;i++) {
+      var i;
+      for (i=0;i<table_data_array.length;i++) {
         if (parseInt(table_data_array[i], 16) > 10 && parseInt( Math.random()*10) > 2) {
-          table_data_array[i] = "d".toString(16) //parseInt(Math.random()*256).toString(16);
+          table_data_array[i] = "d".toString(16); //parseInt(Math.random()*256).toString(16);
         }
       }
-      for (var i=0;i<table_data_array.length;i++) {
+      for (i=0;i<table_data_array.length;i++) {
         if (parseInt(table_data_array[i], 16) < 7  && parseInt( Math.random()*10) > 5) {
           table_data_array[i] = parseInt(Math.random()*-200).toString(16);
         }
@@ -137,7 +138,7 @@
       // Glyf
       var glyf_table_dir  = woff.table_dir_by_tag('glyf');
       var glyf_array = BinUtil.read_bytes(woff.font_table(glyf_table_dir.index));
-      for (var i=0;i<glyf_array.length;i++) {
+      for (i=0;i<glyf_array.length;i++) {
         if (
             parseInt(glyf_array[i], 16) > 190 &&
             parseInt(glyf_array[i], 16) < 250 &&

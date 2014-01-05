@@ -25,7 +25,7 @@
     this._parse_woff_header();
     this._parse_table_dirs();
     this._parse_font_tables();
-  };
+  }
 
   // Inherit from EventEmitter.
   WOFF.prototype = EventEmitter.prototype;
@@ -607,14 +607,14 @@
       table = BinUtil.read_bytes(str);
     }
     else {
-      table = str
+      table = str;
     }
     var number_of_bytes_in_table = table.length*2,
         sum     = 0,
         nlongs  = Math.floor((number_of_bytes_in_table + 3) / 4);
     var j = 0;
     var b0, b1, b2, b3, uint;
-    while (nlongs -= 1 > 0) {
+    while ((nlongs -= 1) > 0) {
      if (typeof(table[j]) === 'undefined') break;
      if (!(is_head_table && j == 8)) {
        // skip checkSumAdjustment of head table.
